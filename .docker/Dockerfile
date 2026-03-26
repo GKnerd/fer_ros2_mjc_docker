@@ -90,6 +90,10 @@ COPY --chown=$USER:$USER ${PROJECT_WS}/src /home/$USER/${PROJECT_WS}/src
 
 WORKDIR /home/$USER/${PROJECT_WS}
 
+# Ignore the simulation and test package when building. 
+RUN touch src/cartesian_controllers/cartesian_controller_simulation/COLCON_IGNORE \
+    src/cartesian_controllers/cartesian_controller_tests/COLCON_IGNORE 
+
 RUN sudo apt-get update && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y
