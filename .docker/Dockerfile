@@ -29,6 +29,8 @@ RUN apt-get update && apt-get upgrade -y \
     libfmt-dev  \
     libeigen3-dev \
     python3-pip \
+    ros-${ROS_DISTRO}-moveit \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ##############################################################################
@@ -56,10 +58,11 @@ RUN echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> 
 
 
 # Add DDS profile 
-COPY env/dds_profile.xml /home/${USER}
-RUN chown ${USER}:${USER} /home/${USER}/dds_profile.xml
-ENV FASTRTPS_DEFAULT_PROFILES_FILE=/home/${USER}/dds_profile.xml
+COPY env/cyclone_dds.xml /home/${USER}
+RUN chown ${USER}:${USER} /home/${USER}/cyclone_dds.xml
 
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ENV CYCLONEDDS_URI=file:///home/${USER}/cyclone_dds.xml
 
 # Create base directories
 USER ${USER}

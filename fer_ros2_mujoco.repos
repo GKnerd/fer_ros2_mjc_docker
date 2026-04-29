@@ -5,7 +5,7 @@ repositories:
     version: 72baf5bf4e88eaec27f0eb61be1b20a001abf2ab
   franka_mujoco_sim_bringup:
     type: git
-    url: git@github.com:GKnerd/mujoco_sim_bringup.git
+    url: https://github.com/GKnerd/mujoco_sim_bringup.git
     version: main
   mujoco_ros2_control:
     type: git
@@ -19,3 +19,8 @@ repositories:
     type: git
     url: https://github.com/fzi-forschungszentrum-informatik/cartesian_controllers.git
     version: ros2
+  panda_moveit_config:
+    type: git
+    url: https://github.com/GKnerd/panda_moveit_config.git
+    version: a86da56ab1c756a851d8ee2a06dd04266d1653d6
+    
