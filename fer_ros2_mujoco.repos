@@ -15,6 +15,10 @@ repositories:
     type: git
     url: https://github.com/pal-robotics/mujoco_vendor.git
     version: 26187d69dd239adc45c121af780d57590d189686
+  cartesian_controllers:
+    type: git
+    url: https://github.com/fzi-forschungszentrum-informatik/cartesian_controllers.git
+    version: ros2
   panda_moveit_config:
     type: git
     url: https://github.com/GKnerd/panda_moveit_config.git
