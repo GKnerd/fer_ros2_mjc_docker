@@ -22,7 +22,7 @@ repositories:
   panda_moveit_config:
     type: git
     url: https://github.com/GKnerd/panda_moveit_config.git
-    version: a86da56ab1c756a851d8ee2a06dd04266d1653d6
+    version: jazzy-devel
   fer_skills:
     type: git
     url:  https://github.com/GKnerd/fer_skills.git
