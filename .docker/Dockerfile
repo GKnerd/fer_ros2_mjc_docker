@@ -74,8 +74,19 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y \
     python3-colcon-common-extensions \
     python3-rosdep \
+    python3-venv \
+    python3-pip \
+    python3-pandas \
+    python3-matplotlib \
+    libglfw3 \
+    libglfw3-dev \
     ros-${ROS_DISTRO}-ros2-controllers \
     ros-${ROS_DISTRO}-ros2-control \
+    ros-${ROS_DISTRO}-ros2-control-cmake \
+    ros-${ROS_DISTRO}-controller-manager \
+    ros-${ROS_DISTRO}-xacro \
+    ros-${ROS_DISTRO}-kdl-parser \
+    ros-${ROS_DISTRO}-orocos-kdl-vendor \
     ros-${ROS_DISTRO}-rviz2 \
     ros-$ROS_DISTRO-rqt* \
     && rm -rf /var/lib/apt/lists/*
@@ -91,8 +102,8 @@ COPY --chown=$USER:$USER ${PROJECT_WS}/src /home/$USER/${PROJECT_WS}/src
 WORKDIR /home/$USER/${PROJECT_WS}
 
 # Ignore the simulation and test package when building. 
-RUN touch src/cartesian_controllers/cartesian_controller_simulation/COLCON_IGNORE \
-    src/cartesian_controllers/cartesian_controller_tests/COLCON_IGNORE 
+RUN [ -d src/cartesian_controllers/cartesian_controller_simulation ] && touch src/cartesian_controllers/cartesian_controller_simulation/COLCON_IGNORE || true && \
+    [ -d src/cartesian_controllers/cartesian_controller_tests ] && touch src/cartesian_controllers/cartesian_controller_tests/COLCON_IGNORE || true
 
 RUN sudo apt-get update && \
     rosdep update && \
