@@ -13,21 +13,24 @@ find_package(kdl_parser REQUIRED)
 find_package(orocos_kdl_vendor REQUIRED)
 
 add_executable(feedback_linearization_node src/feedback_linearization_node.cpp)
+add_executable(mpc_controller_node src/mpc_controller_node.cpp)
 
-ament_target_dependencies(feedback_linearization_node
-  rclcpp
-  sensor_msgs
-  std_msgs
-  kdl_parser
-  orocos_kdl_vendor
-)
-
-target_link_libraries(feedback_linearization_node
-  orocos-kdl
-)
+foreach(target feedback_linearization_node mpc_controller_node)
+  ament_target_dependencies(${target}
+    rclcpp
+    sensor_msgs
+    std_msgs
+    kdl_parser
+    orocos_kdl_vendor
+  )
+  target_link_libraries(${target}
+    orocos-kdl
+  )
+endforeach()
 
 install(TARGETS
   feedback_linearization_node
+  mpc_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

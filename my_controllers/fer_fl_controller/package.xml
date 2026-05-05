@@ -13,7 +13,6 @@
   <depend>std_msgs</depend>
   <depend>kdl_parser</depend>
   <depend>orocos_kdl_vendor</depend>
-  <depend>robot_state_publisher</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

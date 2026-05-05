@@ -178,6 +178,7 @@
 // }
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <memory>
@@ -208,17 +209,28 @@ public:
       "fer_joint5", "fer_joint6", "fer_joint7"
     };
 
-    q_des_   = {0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854};
+    // Target pose (different from the initial home pose so the FL visibly drives
+    // the robot on startup). Home pose is {0, -pi/4, 0, -3pi/4, 0, pi/2, pi/4}.
+    q_des_   = {0.5, -1.0, 0.0, -1.5, 0.0, 2.0, 0.3};
     dq_des_  = std::vector<double>(7, 0.0);
     ddq_des_ = std::vector<double>(7, 0.0);
 
-    kp_ = {30.0, 30.0, 25.0, 15.0, 8.0, 6.0, 4.0};
-    kd_ = { 8.0,  8.0,  6.0,  8.0, 3.0, 2.0, 1.5};
+    // Gains tuned for critically-damped response (kd = 2*sqrt(kp)).
+    // Higher values compensate for motor armature that KDL doesn't model.
+    kp_ = {100.0, 100.0, 100.0, 100.0, 50.0, 50.0, 50.0};
+    kd_ = { 20.0,  20.0,  20.0,  20.0, 14.0, 14.0, 14.0};
 
     tau_limits_ = {87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0};
 
+    // Reflected motor inertia (motor_inertia * gear_ratio^2) from dynamics.yaml.
+    // Joints 1-2: 4.206399e-5 * 120^2; joints 3-4: 3.211626e-5 * 120^2;
+    // joints 5-7: 3.211626e-5 * 80^2. Matches MuJoCo armature in the MJCF.
+    armature_ = {0.605721456, 0.605721456,
+                 0.462474144, 0.462474144,
+                 0.205544064, 0.205544064, 0.205544064};
+
     effort_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
-      "/effort_controller/commands", 10);
+      "/effort_forward_controller/commands", 10);
 
     joint_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
       "/joint_states", 10,
@@ -243,6 +255,7 @@ public:
     for (int i = 0; i < 7; ++i) log_file_ << ",mv" << i + 1;
     for (int i = 0; i < 7; ++i) log_file_ << ",c" << i + 1;
     for (int i = 0; i < 7; ++i) log_file_ << ",g" << i + 1;
+    for (int i = 0; i < 7; ++i) log_file_ << ",tau_friction" << i + 1;
     for (int i = 0; i < 7; ++i) log_file_ << ",tau_raw" << i + 1;
     for (int i = 0; i < 7; ++i) log_file_ << ",tau_sat" << i + 1;
 
@@ -259,6 +272,29 @@ public:
   }
 
 private:
+  // Identified friction model for Franka Panda (Cognetti et al. 2019).
+  // Parameters: FI_1=amplitude, FI_2=sigmoid slope, FI_3=velocity offset.
+  // Returns torque the motor must supply to overcome friction (add to tau_raw).
+  std::vector<double> computeFrictionTorque(const std::vector<double> & dq)
+  {
+    const std::vector<double> fi1 = {
+      0.54615, 0.87224, 0.64068, 1.2794, 0.83904, 0.30301, 0.56489
+    };
+    const std::vector<double> fi2 = {
+      5.1181, 9.0657, 10.136, 5.5903, 8.3469, 17.133, 10.336
+    };
+    const std::vector<double> fi3 = {
+      0.039533, 0.025882, -0.04607, 0.036194, 0.026226, -0.021047, 0.0035526
+    };
+
+    std::vector<double> tau_friction(7, 0.0);
+    for (size_t i = 0; i < 7; ++i) {
+      const double tau_f_const = fi1[i] / (1.0 + std::exp(-fi2[i] * fi3[i]));
+      tau_friction[i] = fi1[i] / (1.0 + std::exp(-fi2[i] * (dq[i] + fi3[i]))) - tau_f_const;
+    }
+    return tau_friction;
+  }
+
   void robotDescriptionCallback(const std_msgs::msg::String::SharedPtr msg)
   {
     std::scoped_lock<std::mutex> lock(mutex_);
@@ -273,8 +309,11 @@ private:
       return;
     }
 
-    if (!tree.getChain("base", "fer_link8", chain_)) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to extract KDL chain from base to fer_link8");
+    // Use fer_hand_tcp as tip so KDL includes the hand mass (0.654 kg).
+    // The MJCF converter merges fer_link7+fer_link8+fer_hand into one body;
+    // stopping at fer_link8 would leave the hand mass out of KDL's model.
+    if (!tree.getChain("base", "fer_hand_tcp", chain_)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to extract KDL chain from base to fer_hand_tcp");
       return;
     }
 
@@ -319,6 +358,7 @@ private:
     std::vector<double> mv_vec(7, 0.0);
     std::vector<double> c_vec(7, 0.0);
     std::vector<double> g_vec(7, 0.0);
+    std::vector<double> tau_friction(7, 0.0);
     std::vector<double> tau_raw(7, 0.0);
     std::vector<double> tau_sat(7, 0.0);
 
@@ -367,18 +407,28 @@ private:
       v[i] = ddq_des_[i] + kd_[i] * de + kp_[i] * error[i];
     }
 
+    tau_friction = computeFrictionTorque(dq);
+
     for (size_t i = 0; i < 7; ++i) {
       double mv = 0.0;
 
       for (size_t j = 0; j < 7; ++j) {
-        mv += mass_kdl_(i, j) * v[j];
+        // Add reflected motor inertia (armature) to the diagonal of M.
+        // The MJCF sets armature on every joint; KDL only models link inertia.
+        double M_ij = mass_kdl_(i, j);
+        if (i == j) M_ij += armature_[i];
+        mv += M_ij * v[j];
       }
 
       mv_vec[i] = mv;
       c_vec[i] = coriolis_kdl_(i);
       g_vec[i] = gravity_kdl_(i);
 
-      tau_raw[i] = mv_vec[i] + c_vec[i] + g_vec[i];
+      // DO NOT add g_vec: the MJCF sets gravcomp=1 on every body so MuJoCo
+      // already cancels gravity.  Adding g here would double-compensate and
+      // push joints to the wrong equilibrium.
+      // Add tau_friction (+) to supply the extra torque needed to overcome it.
+      tau_raw[i] = mv_vec[i] + c_vec[i] + tau_friction[i];
       tau_sat[i] = std::clamp(tau_raw[i], -tau_limits_[i], tau_limits_[i]);
     }
 
@@ -404,6 +454,7 @@ private:
       for (double val : mv_vec) log_file_ << "," << val;
       for (double val : c_vec) log_file_ << "," << val;
       for (double val : g_vec) log_file_ << "," << val;
+      for (double val : tau_friction) log_file_ << "," << val;
       for (double val : tau_raw) log_file_ << "," << val;
       for (double val : tau_sat) log_file_ << "," << val;
 
@@ -429,6 +480,7 @@ private:
   std::vector<double> kp_;
   std::vector<double> kd_;
   std::vector<double> tau_limits_;
+  std::vector<double> armature_;
 
   KDL::Chain chain_;
   std::unique_ptr<KDL::ChainDynParam> dyn_solver_;
