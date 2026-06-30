@@ -5,7 +5,7 @@ repositories:
     version: 72baf5bf4e88eaec27f0eb61be1b20a001abf2ab
   fer_ros2_mjc_bringup:
     type: git
-    url: https://github.com/GKnerd/mujoco_sim_bringup.git
+    url: https://github.com/GKnerd/fer_ros2_mjc_bringup.git
     version: main
   mujoco_ros2_control:
     type: git
