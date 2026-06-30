@@ -99,7 +99,6 @@ ENV CYCLONEDDS_URI=file:///home/${USER}/env/cyclone_dds.xml
 # Create base directories
 USER ${USER}
 RUN mkdir -p /home/${USER}/${PROJECT_WS}/src
-
 ##############################################################################
 ##                                 Dependencies                             ##
 ##############################################################################
@@ -119,6 +118,7 @@ RUN apt-get update && \
     ros-${ROS_DISTRO}-moveit-task-constructor-msgs \
     ros-${ROS_DISTRO}-moveit-task-constructor-capabilities \
     ros-${ROS_DISTRO}-moveit-task-constructor-visualization \
+    ros-${ROS_DISTRO}-behaviortree-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 USER ${USER}
@@ -127,9 +127,7 @@ USER ${USER}
 ##############################################################################
 WORKDIR /home/${USER}/${PROJECT_WS}
 COPY --chown=$USER:$USER ${PROJECT_WS}/src /home/$USER/${PROJECT_WS}/src
-
-WORKDIR /home/$USER/${PROJECT_WS}
-
+  
 RUN sudo apt-get update && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y
